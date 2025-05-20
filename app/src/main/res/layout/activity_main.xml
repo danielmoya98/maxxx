@@ -18,7 +18,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent" />
 
-    <!-- Contenedor del buscador -->
     <androidx.cardview.widget.CardView
         android:id="@+id/searchCard"
         android:layout_width="0dp"
@@ -34,52 +33,40 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:padding="8dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:orientation="vertical">
 
-            <!-- Ícono de búsqueda -->
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@android:drawable/ic_menu_search"
-                app:tint="@android:color/darker_gray"
-                android:layout_marginEnd="8dp" />
-
-            <!-- Campo de texto -->
-            <EditText
-                android:id="@+id/searchBar"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Buscar lugar o dirección"
-                android:background="@android:color/transparent"
-                android:inputType="text"
-                android:textColor="@android:color/black"
-                android:textSize="16sp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-            <!-- Botón limpiar -->
-            <ImageButton
-                android:id="@+id/btnClearSearch"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Borrar texto"
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@android:drawable/ic_menu_search"
+                    app:tint="@android:color/darker_gray"
+                    android:layout_marginEnd="8dp" />
+
+                <EditText
+                    android:id="@+id/searchBar"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@android:color/transparent"
+                    android:hint="Buscar lugar..."
+                    android:inputType="text" />
+            </LinearLayout>
+
+            <!-- Resultados dentro del CardView -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/searchResultsRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
                 android:visibility="gone" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- Lista de resultados -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/searchResultsRecycler"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/searchCard"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- Botón ubicación -->
     <ImageButton

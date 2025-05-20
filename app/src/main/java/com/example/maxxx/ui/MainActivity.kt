@@ -2,14 +2,18 @@ package com.example.maxxx.ui
 
 import android.animation.ValueAnimator
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.maxxx.R
 import com.example.maxxx.databinding.ActivityMainBinding
+import com.example.maxxx.ui.model.Place
 import com.example.maxxx.ui.viewmodel.MainViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -21,87 +25,124 @@ import com.google.android.gms.maps.model.LatLng
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var map: GoogleMap
+    private var map: GoogleMap? = null
     private val viewModel: MainViewModel by viewModels()
+    private lateinit var adapter: SearchResultsAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        setupRecyclerView()
+        setupMapFragment()
+        setupMapTypeSelector()
+        setupLocationButton()
+        setupSearchBar()
+        observeViewModel()
+    }
+
+    private fun setupRecyclerView() {
         val recyclerView = binding.searchResultsRecycler
-        val adapter = SearchResultsAdapter(emptyList()) { selected ->
-            binding.searchBar.setText(selected)
+
+        adapter = SearchResultsAdapter(emptyList(), onItemClick = { selectedPlace ->
+            binding.searchBar.setText(selectedPlace.name)
             recyclerView.visibility = View.GONE
-        }
+
+            // Mueve la cámara al lugar seleccionado
+            updateCameraToLocation(selectedPlace.location)
+
+            // Oculta el teclado al seleccionar un lugar
+            hideKeyboard()
+
+        })
+
         recyclerView.adapter = adapter
         recyclerView.layoutManager = LinearLayoutManager(this)
 
         viewModel.searchResults.observe(this) { results ->
-            adapter.updateData(results)
-            recyclerView.visibility = if (results.isEmpty()) View.GONE else View.VISIBLE
+            adapter.updateData(results, viewModel.searchQuery.value ?: "")
+            recyclerView.isVisible = results.isNotEmpty()
             animateRecyclerGrowth(recyclerView, results.size)
         }
+    }
 
-
-        // Configurar el mapa
+    private fun setupMapFragment() {
         val mapFragment = supportFragmentManager
-            .findFragmentById(R.id.mapFragment) as SupportMapFragment
-        mapFragment.getMapAsync(this)
+            .findFragmentById(R.id.mapFragment) as? SupportMapFragment
+        mapFragment?.getMapAsync(this)
+    }
 
-        // Configurar selector de tipo de mapa
-        ArrayAdapter.createFromResource(
+    private fun setupMapTypeSelector() {
+        val adapterSpinner = android.widget.ArrayAdapter.createFromResource(
             this,
             R.array.map_types,
             android.R.layout.simple_spinner_item
-        ).also { adapter ->
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            binding.mapTypeSelector.adapter = adapter
+        ).also {
+            it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
 
-        binding.mapTypeSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
-                when (position) {
-                    0 -> map.mapType = GoogleMap.MAP_TYPE_NORMAL
-                    1 -> map.mapType = GoogleMap.MAP_TYPE_SATELLITE
-                    2 -> map.mapType = GoogleMap.MAP_TYPE_TERRAIN
-                    3 -> map.mapType = GoogleMap.MAP_TYPE_HYBRID
+        binding.mapTypeSelector.adapter = adapterSpinner
+
+        binding.mapTypeSelector.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                map?.mapType = when (position) {
+                    1 -> GoogleMap.MAP_TYPE_SATELLITE
+                    2 -> GoogleMap.MAP_TYPE_TERRAIN
+                    3 -> GoogleMap.MAP_TYPE_HYBRID
+                    else -> GoogleMap.MAP_TYPE_NORMAL
                 }
             }
 
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
+    }
 
-        // Botón para centrar en Sucre
+    private fun setupLocationButton() {
         binding.btnMyLocation.setOnClickListener {
             viewModel.updateUserLocation(-19.03332, -65.26274)
         }
+    }
 
-        // Buscar cuando se presiona enter
-        binding.searchBar.setOnEditorActionListener { _, _, _ ->
-            val query = binding.searchBar.text.toString()
-            viewModel.setSearchQuery(query)
-            true
+    private fun setupSearchBar() {
+        // Búsqueda en tiempo real con addTextChangedListener
+        binding.searchBar.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) { }
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                viewModel.setSearchQuery(s.toString())
+            }
+            override fun afterTextChanged(s: Editable?) { }
+        })
+
+        // También manejo búsqueda al presionar buscar en teclado
+        binding.searchBar.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
+                viewModel.setSearchQuery(binding.searchBar.text.toString())
+                true
+            } else {
+                false
+            }
         }
+    }
 
-        // Observar ubicación
+    private fun observeViewModel() {
         viewModel.userLocation.observe(this) { location ->
             updateCameraToLocation(location)
         }
     }
 
     private fun animateRecyclerGrowth(view: View, itemCount: Int) {
-        val targetHeight = if (itemCount > 0) itemCount * 120 else 0 // aprox. 120px por ítem
+        val itemHeightPx = resources.getDimensionPixelSize(R.dimen.recycler_item_height)
+        val targetHeight = itemHeightPx * itemCount
         val anim = ValueAnimator.ofInt(view.height, targetHeight)
         anim.addUpdateListener {
             val value = it.animatedValue as Int
             view.layoutParams.height = value
             view.requestLayout()
         }
-        anim.duration = 300
+        anim.duration = 900
         anim.start()
     }
-
 
     override fun onMapReady(googleMap: GoogleMap) {
         map = googleMap
@@ -114,9 +155,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             .bearing(90f)
             .build()
 
-        map.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition))
+        map?.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition))
 
-        map.uiSettings.apply {
+        map?.uiSettings?.apply {
             isZoomControlsEnabled = true
             isCompassEnabled = true
             isRotateGesturesEnabled = true
@@ -132,6 +173,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             .bearing(90f)
             .build()
 
-        map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition))
+        map?.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition))
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(binding.searchBar.windowToken, 0)
     }
 }
