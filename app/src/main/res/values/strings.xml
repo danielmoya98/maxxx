@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">maxxx</string>
+    <string-array name="map_types">
+        <item>Normal</item>
+        <item>Satélite</item>
+        <item>Terreno</item>
+        <item>Híbrido</item>
+    </string-array>
+
+</resources>
