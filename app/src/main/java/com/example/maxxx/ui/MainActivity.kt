@@ -13,14 +13,9 @@ import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.maxxx.R
 import com.example.maxxx.databinding.ActivityMainBinding
-import com.example.maxxx.ui.model.Place
 import com.example.maxxx.ui.viewmodel.MainViewModel
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.GoogleMap
-import com.google.android.gms.maps.OnMapReadyCallback
-import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.*
+import com.google.android.gms.maps.model.*
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -49,12 +44,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             binding.searchBar.setText(selectedPlace.name)
             recyclerView.visibility = View.GONE
 
-            // Mueve la cámara al lugar seleccionado
-            updateCameraToLocation(selectedPlace.location)
+            // Anima la cámara hacia el lugar seleccionado
+            animateToLocationSmoothly(selectedPlace.location)
 
-            // Oculta el teclado al seleccionar un lugar
             hideKeyboard()
-
         })
 
         recyclerView.adapter = adapter
@@ -105,7 +98,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun setupSearchBar() {
-        // Búsqueda en tiempo real con addTextChangedListener
         binding.searchBar.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) { }
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -114,7 +106,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             override fun afterTextChanged(s: Editable?) { }
         })
 
-        // También manejo búsqueda al presionar buscar en teclado
         binding.searchBar.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
                 viewModel.setSearchQuery(binding.searchBar.text.toString())
@@ -127,7 +118,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun observeViewModel() {
         viewModel.userLocation.observe(this) { location ->
-            updateCameraToLocation(location)
+            animateToLocationSmoothly(location)
         }
     }
 
@@ -148,14 +139,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         map = googleMap
 
         val sucreLocation = LatLng(-19.03332, -65.26274)
-        val cameraPosition = CameraPosition.Builder()
-            .target(sucreLocation)
-            .zoom(17f)
-            .tilt(45f)
-            .bearing(90f)
-            .build()
 
-        map?.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition))
+        // Usamos animación también en el primer movimiento de cámara
+        animateToLocationSmoothly(sucreLocation)
 
         map?.uiSettings?.apply {
             isZoomControlsEnabled = true
@@ -165,7 +151,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    private fun updateCameraToLocation(location: LatLng) {
+    // 🎯 Esta función hace que la cámara se mueva suavemente al nuevo destino
+    private fun animateToLocationSmoothly(location: LatLng) {
+        map?.clear()
+
+        map?.addMarker(
+            MarkerOptions()
+                .position(location)
+                .title("Ubicación seleccionada")
+        )
+
         val cameraPosition = CameraPosition.Builder()
             .target(location)
             .zoom(17f)
@@ -173,7 +168,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             .bearing(90f)
             .build()
 
-        map?.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition))
+        val cameraUpdate = CameraUpdateFactory.newCameraPosition(cameraPosition)
+
+        map?.animateCamera(cameraUpdate, 1500, null) // animación en 1.5 segundos
     }
 
     private fun hideKeyboard() {

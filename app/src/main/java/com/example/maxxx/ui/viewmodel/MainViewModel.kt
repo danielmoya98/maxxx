@@ -26,34 +26,19 @@ class MainViewModel : ViewModel() {
         }
 
         val mockResults = listOf(
-            Place(
-                name = "$query Plaza 25 de Mayo",
-                address = "Centro, Sucre",
-                location = LatLng(-19.0414, -65.2595)
-            ),
-            Place(
-                name = "$query Mercado Central",
-                address = "Calle Ravelo, Sucre",
-                location = LatLng(-19.0420, -65.2590)
-            ),
-            Place(
-                name = "$query Universidad San Francisco",
-                address = "Av. Germán Mendoza, Sucre",
-                location = LatLng(-19.0482, -65.2620)
-            ),
-            Place(
-                name = "$query Estadio Patria",
-                address = "Zona El Tejar, Sucre",
-                location = LatLng(-19.0340, -65.2620)
-            ),
-            Place(
-                name = "$query Hospital Central",
-                address = "Av. Bolívar, Sucre",
-                location = LatLng(-19.035, -65.264)
-            )
+            Place("Plaza 25 de Mayo", "Centro, Sucre", LatLng(-19.0414, -65.2595)),
+            Place("Mercado Central", "Calle Ravelo, Sucre", LatLng(-19.0420, -65.2590)),
+            Place("Universidad San Francisco", "Av. Germán Mendoza, Sucre", LatLng(-19.0482, -65.2620)),
+            Place("Estadio Patria", "Zona El Tejar, Sucre", LatLng(-19.0340, -65.2620)),
+            Place("Hospital Central", "Av. Bolívar, Sucre", LatLng(-19.035, -65.264))
         )
 
-        _searchResults.value = mockResults
+        val filteredResults = mockResults.filter {
+            it.name.contains(query, ignoreCase = true) ||
+                    it.address.contains(query, ignoreCase = true)
+        }
+
+        _searchResults.value = filteredResults
     }
 
     fun updateUserLocation(latitude: Double, longitude: Double) {
