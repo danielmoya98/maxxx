@@ -2,9 +2,12 @@ package com.example.maxxx.ui
 
 import android.animation.ValueAnimator
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
+import android.view.animation.BounceInterpolator
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.viewModels
@@ -43,10 +46,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         adapter = SearchResultsAdapter(emptyList(), onItemClick = { selectedPlace ->
             binding.searchBar.setText(selectedPlace.name)
             recyclerView.visibility = View.GONE
-
-            // Anima la cámara hacia el lugar seleccionado
             animateToLocationSmoothly(selectedPlace.location)
-
             hideKeyboard()
         })
 
@@ -98,23 +98,49 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun setupSearchBar() {
+        val clearIcon = R.drawable.ic_clear
+
+        // Mostrar o quitar el ícono según haya texto o no
+        fun updateClearIcon() {
+            val icon = if (binding.searchBar.text?.isNotEmpty() == true) {
+                resources.getDrawable(clearIcon, null)
+            } else null
+
+            binding.searchBar.setCompoundDrawablesWithIntrinsicBounds(null, null, icon, null)
+        }
+
+        // Al tocar el ícono de limpiar
+        binding.searchBar.setOnTouchListener { v, event ->
+            val drawableEnd = binding.searchBar.compoundDrawables[2] ?: return@setOnTouchListener false
+
+            val touchX = event.x.toInt()
+            val iconStart = binding.searchBar.width - binding.searchBar.paddingEnd - drawableEnd.intrinsicWidth
+
+            if (touchX >= iconStart) {
+                binding.searchBar.text?.clear()
+                true
+            } else false
+        }
+
+        // Escuchar cambios y mostrar ícono
         binding.searchBar.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) { }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 viewModel.setSearchQuery(s.toString())
+                updateClearIcon()
             }
-            override fun afterTextChanged(s: Editable?) { }
+            override fun afterTextChanged(s: Editable?) {}
         })
 
+        // Buscar al hacer "Enter"
         binding.searchBar.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
                 viewModel.setSearchQuery(binding.searchBar.text.toString())
                 true
-            } else {
-                false
-            }
+            } else false
         }
     }
+
 
     private fun observeViewModel() {
         viewModel.userLocation.observe(this) { location ->
@@ -139,8 +165,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         map = googleMap
 
         val sucreLocation = LatLng(-19.03332, -65.26274)
-
-        // Usamos animación también en el primer movimiento de cámara
         animateToLocationSmoothly(sucreLocation)
 
         map?.uiSettings?.apply {
@@ -149,17 +173,25 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             isRotateGesturesEnabled = true
             isTiltGesturesEnabled = true
         }
+
+        // Mostrar info cuando se toca el marcador
+        map?.setOnMarkerClickListener { marker ->
+            marker.showInfoWindow()
+            true
+        }
     }
 
-    // 🎯 Esta función hace que la cámara se mueva suavemente al nuevo destino
     private fun animateToLocationSmoothly(location: LatLng) {
         map?.clear()
 
-        map?.addMarker(
+        val marker = map?.addMarker(
             MarkerOptions()
                 .position(location)
                 .title("Ubicación seleccionada")
         )
+
+        // Rebotar el marcador
+        marker?.let { bounceMarker(it) }
 
         val cameraPosition = CameraPosition.Builder()
             .target(location)
@@ -168,9 +200,27 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             .bearing(90f)
             .build()
 
-        val cameraUpdate = CameraUpdateFactory.newCameraPosition(cameraPosition)
+        map?.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition))
+    }
 
-        map?.animateCamera(cameraUpdate, 1500, null) // animación en 1.5 segundos
+    // 👇 Animación de rebote del marcador
+    private fun bounceMarker(marker: Marker) {
+        val handler = Handler(Looper.getMainLooper())
+        val start = System.currentTimeMillis()
+        val duration: Long = 1500
+        val interpolator = BounceInterpolator()
+
+        handler.post(object : Runnable {
+            override fun run() {
+                val elapsed = System.currentTimeMillis() - start
+                val t = Math.max(1 - interpolator.getInterpolation(elapsed.toFloat() / duration), 0f)
+                marker.setAnchor(0.5f, 1.0f + 2 * t)
+
+                if (t > 0.0) {
+                    handler.postDelayed(this, 16)
+                }
+            }
+        })
     }
 
     private fun hideKeyboard() {
